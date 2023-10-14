@@ -145,9 +145,12 @@ object hof{
 
    case class Record(value: String)
 
-   case class Request()
-   
-   object Request {
+   case class Request() {
+     def save(): Unit = ???
+
+   }
+
+  object Request {
        def parse(str: String): Request = ???
    }
 
@@ -156,7 +159,12 @@ object hof{
    * (Опционально) Реализовать ф-цию, которая будет читать записи Request из топика,
    * и сохранять их в базу
    */
-   def createRequestSubscription() = ???
+   def createRequestSubscription(consumer: Consumer): Unit = {
+        consumer.subscribe("request").foreach(r => {
+            val request = Request.parse(r.value)
+            request.save()
+        })
+   }
 
 
 
@@ -179,68 +187,64 @@ object hof{
    * Реализовать структуру данных Option, который будет указывать на присутствие либо отсутсвие результата
    */
 
-   // + covariant Option[Animal] родитель для Option[Dog]
-   // invariant Option[Animal] нет связи Option[Dog]
-   // - contravariant связь наоборот между Option[Animal] и Option[Dog]
+  // + covariant Option[Animal] родитель для Option[Dog]
+  // invariant Option[Animal] нет связи Option[Dog]
+  // - contravariant связь наоборот между Option[Animal] и Option[Dog]
 
-   class Animal
-   class Dog extends Animal
+  class Animal
 
-   def findAnimal: Option[Animal] = ???
-   def findDog: Option[Dog] = ???
+  class Dog extends Animal
 
-   def treat(animal: Animal): Unit = ???
+  def findAnimal: Option[Animal] = ???
 
-   def treat(animal: Option[Animal]): Unit = ???
+  def findDog: Option[Dog] = ???
 
-   val animal: Animal = ???
-   val dog: Dog = ???
-   treat(animal)
-   treat(dog)
+  def treat(animal: Animal): Unit = ???
+
+  def treat(animal: Option[Animal]): Unit = ???
+
+  val animal: Animal = ???
+  val dog: Dog = ???
+  treat(animal)
+  treat(dog)
 
   def divide(x: Int, y: Int): Option[Int] = {
-    if(y == 0) None
+    if (y == 0) None
     else Some(x / y)
   }
 
-  sealed trait Option[+T]{
+  sealed trait Option[+T] {
 
-     def isEmpty: Boolean = this match {
-       case None => true
-       case Some(v) => false
-     }
+    def isEmpty: Boolean = this match {
+      case None => true
+      case Some(v) => false
+    }
 
-     def get: T = this match {
-       case Some(v) => v
-       case None => throw new Exception("get on empty Option")
-     }
+    def get: T = this match {
+      case Some(v) => v
+      case None => throw new Exception("get on empty Option")
+    }
 
-     def map[B](f: T => B): Option[B] = flatMap(v => Option(f(v)))
+    def map[B](f: T => B): Option[B] = flatMap(v => Option(f(v)))
 
-     def flatMap[B](f: T => Option[B]): Option[B] = this match {
-       case Some(v) => f(v)
-       case None => None
-     }
+    def flatMap[B](f: T => Option[B]): Option[B] = this match {
+      case Some(v) => f(v)
+      case None => None
+    }
   }
 
   val opt: Option[Int] = ???
 
-  val opt2: Option[Int] =  opt.flatMap(i => Option(i + 1))
-  val opt3  =  opt.map(i => i + 1)
+  val opt2: Option[Int] = opt.flatMap(i => Option(i + 1))
+  val opt3 = opt.map(i => i + 1)
 
   case class Some[T](v: T) extends Option[T]
+
   case object None extends Option[Nothing]
 
-  object Option{
+  object Option {
     def apply[T](v: T): Option[T] = Some(v)
   }
-
-
-
-
-
-
-
 
 
   /**
@@ -248,11 +252,25 @@ object hof{
    * Реализовать метод printIfAny, который будет печатать значение, если оно есть
    */
 
+  def printIfAny(s: Option[Any]): Unit = {
+    s match {
+      case Some(v) => print(v)
+      case None => print("Значения нет")
+    }
+  }
+
+  val value = None
+
+  printIfAny(value)
 
   /**
    *
    * Реализовать метод zip, который будет создавать Option от пары значений из 2-х Option
    */
+
+  def zip(fv: Option[Any], sv: Option[Any]): Option[(Any, Any)] = {
+    fv.flatMap(a => sv.map(y => (a, y)))
+  }
 
 
   /**
@@ -261,7 +279,14 @@ object hof{
    * в случае если исходный не пуст и предикат от значения = true
    */
 
- }
+  def filter(fv: Option[Any], f: Any => Boolean): Option[Any] = {
+    fv match {
+      case Some(v) if f(v) => Some(v)
+      case _ => None
+    }
+
+  }
+}
 
  object list {
    /**
@@ -298,10 +323,26 @@ object hof{
      *
      */
 
+   def ::[T](elem: T, list: List[T]): List[T] = Cons(elem, list)
+
     /**
       * Метод mkString возвращает строковое представление списка, с учетом переданного разделителя
       *
       */
+
+   def mkString[T](lst: List[T], razd: String): String = {
+     var s = ""
+
+     @tailrec
+     def loop(lst: List[T]): String = {
+       lst match {
+          case Nil => s
+          case Cons(head, tail) => s += head + razd; loop(tail)
+       }
+     }
+     loop(lst)
+   }
+
 
     /**
       * Конструктор, позволяющий создать список из N - го числа аргументов
@@ -316,22 +357,66 @@ object hof{
       * Реализовать метод reverse который позволит заменить порядок элементов в списке на противоположный
       */
 
+   def reverse[T](lst: List[T]): List[T] = {
+     var s = List[T]()
+
+     @tailrec
+     def loop(lst: List[T]): List[T] = {
+       lst match {
+         case Nil => s
+         case Cons(head, tail) => s = head :: s; loop(tail)
+       }
+     }
+
+     loop(lst)
+   }
+
     /**
       *
       * Реализовать метод map для списка который будет применять некую ф-цию к элементам данного списка
       */
 
+     def map[T](lst: List[T], f: T => T): List[T] = {
+       var s = List[T]()
+
+        @tailrec
+        def loop(lst: List[T]): List[T] = {
+          lst match {
+            case Nil => s
+            case Cons(head, tail) => s = f(head) :: s; loop(tail)
+          }
+        }
+        loop(lst)
+     }
 
     /**
       *
       * Реализовать метод filter для списка который будет фильтровать список по некому условию
       */
 
+      def filter[T](lst: List[T], f: T => Boolean): List[T] = {
+        var s = List[T]()
+
+        @tailrec
+        def loop(lst: List[T]): List[T] = {
+          lst match {
+            case Nil => s
+            case Cons(head, tail) if f(head) => s = head :: s; loop(tail)
+            case Cons(head, tail) => loop(tail)
+          }
+        }
+
+        loop(lst)
+      }
     /**
       *
       * Написать функцию incList котрая будет принимать список Int и возвращать список,
       * где каждый элемент будет увеличен на 1
       */
+
+        def incList(lst: List[Int]): List[Int] = {
+          map(lst, s => s + 1)
+        }
 
 
     /**
@@ -339,5 +424,9 @@ object hof{
       * Написать функцию shoutString котрая будет принимать список String и возвращать список,
       * где к каждому элементу будет добавлен префикс в виде '!'
       */
+
+   def shoutString(lst: List[String]): List[String] = {
+     map(lst, s => "!" + s)
+   }
 
  }
