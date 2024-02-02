@@ -11,8 +11,28 @@ object higher_kinded_types{
   def tuple[E, A, B](a: Either[E, A], b: Either[E, B]): Either[E, (A, B)] =
     a.flatMap{ a => b.map((a, _))}
 
+  trait Combiner[F[_]] {
+    def combine[A, B](fa: F[A], fb: F[B]): F[(A, B)]
+  }
 
-  def tuplef[F[_], A, B](fa: F[A], fb: F[B]): F[(A, B)] = ???
+  object Combiner {
+    implicit val listCombiner: Combiner[List] = new Combiner[List] {
+      def combine[A, B](fa: List[A], fb: List[B]): List[(A, B)] =
+        fa.flatMap(a => fb.map(b => (a, b)))
+    }
+
+    implicit val optionCombiner: Combiner[Option] = new Combiner[Option] {
+      def combine[A, B](fa: Option[A], fb: Option[B]): Option[(A, B)] =
+        fa.flatMap(a => fb.map(b => (a, b)))
+    }
+
+    implicit def eitherCombiner[E]: Combiner[({type lambda[A] = Either[E, A]})#lambda] = new Combiner[({type lambda[A] = Either[E, A]})#lambda] {
+      def combine[A, B](fa: Either[E, A], fb: Either[E, B]): Either[E, (A, B)] =
+        fa.flatMap(a => fb.map(b => (a, b)))
+    }
+  }
+
+  def tuplef[F[_]: Combiner, A, B](fa: F[A], fb: F[B]): F[(A, B)] = implicitly[Combiner[F]].combine(fa, fb)
 
 
   trait Bindable[F[_], A] {
